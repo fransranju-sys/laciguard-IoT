@@ -4,6 +4,17 @@ Penjaga lemari/pintu kos berbasis IoT. **2 HP sebagai edge**, **2 jenis sensor**
 (gerak + cahaya), pengolahan data di edge, **sensor fusion** di detector, dan
 komunikasi ke cloud lewat **MQTT**.
 
+
+**Mata Kuliah Internet of Things, S1 Informatika, Universitas Diponegoro. Kelompok 15.**
+
+| Nama | NIM |
+|---|---|
+| Frans Ranju Christian Pardede | 24060125140130 |
+| Nathanael Tonyus Wilbert Sianipar | 24060125140166 |
+| Randradinata Faiq Prayogo | 24060125120028 |
+
+Repo: https://github.com/fransranju-sys/laciguard-IoT
+
 ```
  HP A (Edge 1, di pintu)            HP B (Edge 2, di dalam lemari)
  accelerometer + gyroscope          sensor cahaya (lux) + alarm
@@ -56,7 +67,7 @@ Alarm menetap sampai DISARM.
 
 ```bash
 # 1. Semua perangkat
-git clone <repo-kamu> && cd laciguard
+git clone https://github.com/fransranju-sys/laciguard-IoT.git && cd laciguard-IoT
 cp .env.example .env          # ganti PROJECT_ID dengan nama unik kelompok
 pip install -r requirements.txt
 
@@ -126,3 +137,9 @@ pip install pytest && pytest -q
 Skenario uji manual untuk PPT/video: ARM lalu pintu diam (AMAN); pintu dibuka pelan
 (ALERT_DIBUKA); buka lalu DISARM <10 dtk (tanpa alert); pintu dihentak (ALERT_DIPAKSA);
 lampu kamar dinyalakan tanpa menyentuh pintu (tidak alert); DISARM lalu buka pintu (AMAN).
+
+## Sumber
+
+Kerangka dasar (pola edge, MQTT, detector, dashboard) mengacu pada contoh proyek
+PocketGuard: https://github.com/myudak/contoh-project-iot1 (lisensi MIT).
+Masalah, sensor, pengolahan data, dan algoritma LaciGuard dirancang sendiri.
