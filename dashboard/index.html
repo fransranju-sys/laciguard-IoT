@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LaciGuard Dashboard</title>
+<style>
+:root{--bg:#f5f5f2;--card:#fff;--text:#1c1c1a;--mute:#6b6b66;--line:#dcdcd6;
+--ok:#1d7a46;--okbg:#e2f3e8;--warn:#9a6200;--warnbg:#fdf0d5;--bad:#b3261e;--badbg:#fbe3e1;--info:#1f5fa8;--infobg:#e1ecf8;
+--c1:#2563b0;--c2:#d9822b;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#161615;--card:#212120;--text:#ececea;--mute:#9a9a94;--line:#3a3a37;
+--ok:#6fd49a;--okbg:#17352440;--warn:#f0b74a;--warnbg:#3a2d12;--bad:#ff8a80;--badbg:#431b18;--info:#7db4ee;--infobg:#17293f;
+--c1:#6aa6ee;--c2:#f0a050;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+padding:16px;max-width:980px;margin-inline:auto}
+h1{font-size:19px;margin:0}
+h2{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin:0 0 8px;font-weight:600}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px}
+.pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:12px;font-weight:600;background:var(--infobg);color:var(--info)}
+.pill.ok{background:var(--okbg);color:var(--ok)}.pill.warn{background:var(--warnbg);color:var(--warn)}.pill.bad{background:var(--badbg);color:var(--bad)}
+details summary{cursor:pointer;font-size:13px;font-weight:600}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+input{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--text);flex:1;min-width:150px}
+button{font:inherit;font-weight:600;padding:8px 16px;border-radius:7px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer}
+button.primary{background:var(--c1);border-color:var(--c1);color:#fff}
+button:disabled{opacity:.45;cursor:not-allowed}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:640px){.grid{grid-template-columns:1fr}}
+.status{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.big{font-size:26px;font-weight:700;padding:6px 14px;border-radius:8px;background:var(--infobg);color:var(--info)}
+.big.ok{background:var(--okbg);color:var(--ok)}.big.warn{background:var(--warnbg);color:var(--warn)}.big.bad{background:var(--badbg);color:var(--bad)}
+.reason{color:var(--mute);font-size:13px;margin:8px 0 0}
+dl{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin:0;font-size:14px}
+dt{color:var(--mute)}dd{margin:0;font-weight:600;font-variant-numeric:tabular-nums}
+canvas{width:100%;height:150px;display:block}
+.legend{font-size:12px;color:var(--mute);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:3px;margin-right:4px;vertical-align:middle}
+ul{list-style:none;margin:0;padding:0;font-size:14px}
+li{padding:7px 0;border-top:1px solid var(--line)}li:first-child{border-top:0}
+li b{color:var(--bad)}li span{display:block;color:var(--mute);font-size:12px}
+.empty{color:var(--mute);font-size:13px}
+</style>
+</head>
+<body>
+<div class="top"><h1>LaciGuard Dashboard</h1><span id="conn" class="pill warn">Belum terhubung</span></div>
+
+<details class="card" id="cfg" open>
+  <summary>Koneksi broker (MQTT over WebSocket)</summary>
+  <div class="row">
+    <input id="pid" placeholder="PROJECT_ID (sama dengan .env)" autocomplete="off">
+    <input id="url" value="wss://broker.hivemq.com:8884/mqtt" autocomplete="off">
+    <button class="primary" id="go">Hubungkan</button>
+  </div>
+</details>
+
+<div class="card">
+  <h2>Status detector</h2>
+  <div class="status">
+    <div id="status" class="big">-</div>
+    <div><span id="state" class="pill">-</span></div>
+  </div>
+  <p class="reason" id="reason">Menunggu data dari detector.py</p>
+  <div class="row">
+    <button id="arm" disabled>ARM</button>
+    <button id="disarm" disabled>DISARM</button>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card"><h2>Edge 1 · HP di pintu</h2>
+    <dl><dt>Sudut pintu</dt><dd id="angle">-</dd><dt>Getaran (RMS)</dt><dd id="rms">-</dd>
+    <dt>Ambang RMS</dt><dd id="rthr">-</dd><dt>Terakhir</dt><dd id="age1">-</dd></dl></div>
+  <div class="card"><h2>Edge 2 · HP di dalam</h2>
+    <dl><dt>Cahaya</dt><dd id="lux">-</dd><dt>Lonjakan</dt><dd id="delta">-</dd>
+    <dt>Ambang cahaya</dt><dd id="lthr">-</dd><dt>Terakhir</dt><dd id="age2">-</dd></dl></div>
+</div>
+
+<div class="grid">
+  <div class="card"><h2>Sudut pintu (derajat)</h2><canvas id="c1"></canvas>
+    <div class="legend"><i style="background:var(--c1)"></i>sudut <i style="background:var(--mute)"></i>ambang terbuka</div></div>
+  <div class="card"><h2>Cahaya (lux)</h2><canvas id="c2"></canvas>
+    <div class="legend"><i style="background:var(--c2)"></i>lux <i style="background:var(--mute)"></i>ambang cahaya</div></div>
+</div>
+
+<div class="card"><h2>Riwayat alert</h2><ul id="alerts"><li class="empty">Belum ada alert.</li></ul></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
+<script>
+(function(){
+"use strict";
+var $=function(id){return document.getElementById(id)};
+var MAXPTS=120, client=null, pid="", last1=0, last2=0, st={};
+var d1=[], d2=[];
+
+try{var saved=localStorage.getItem("laciguard_pid");if(saved)$("pid").value=saved;}catch(e){}
+
+function num(v){v=Number(v);return isFinite(v)?v:null}
+function fmt(v,u,n){v=num(v);return v===null?"-":v.toFixed(n==null?1:n)+(u?" "+u:"")}
+function setConn(t,c){var e=$("conn");e.textContent=t;e.className="pill "+(c||"")}
+function cls(status){
+  if(/^ALERT/.test(status))return"bad";
+  if(status==="AMAN")return"ok";
+  if(status==="KALIBRASI")return"";
+  return"warn";
+}
+function label(s){return String(s||"-").replace(/_/g," ")}
+
+function connect(){
+  pid=$("pid").value.trim().replace(/[^A-Za-z0-9_-]/g,"");
+  if(!pid){setConn("Isi PROJECT_ID","warn");return}
+  try{localStorage.setItem("laciguard_pid",pid)}catch(e){}
+  if(typeof mqtt==="undefined"){setConn("Library MQTT gagal dimuat (cek internet)","bad");return}
+  if(client){client.end(true)}
+  setConn("Menghubungkan...","warn");
+  client=mqtt.connect($("url").value.trim(),{reconnectPeriod:2000,connectTimeout:8000,
+    clientId:"laciguard-dash-"+Math.random().toString(16).slice(2,10)});
+  client.on("connect",function(){
+    setConn("Terhubung","ok");$("arm").disabled=false;$("disarm").disabled=false;
+    client.subscribe("laciguard/"+pid+"/#");
+    $("cfg").open=false;
+  });
+  client.on("reconnect",function(){setConn("Menyambung ulang...","warn")});
+  client.on("close",function(){setConn("Terputus","bad");$("arm").disabled=true;$("disarm").disabled=true});
+  client.on("error",function(){setConn("Gagal terhubung","bad")});
+  client.on("message",function(topic,payload){
+    var data;try{data=JSON.parse(payload.toString())}catch(e){return}
+    if(!data||typeof data!=="object")return;
+    var tail=topic.slice(("laciguard/"+pid+"/").length);
+    if(tail==="status")onStatus(data);
+    else if(tail==="alerts")onAlert(data);
+    else if(tail==="edge/edge1/telemetry")onEdge1(data);
+    else if(tail==="edge/edge2/telemetry")onEdge2(data);
+  });
+}
+
+function onStatus(s){
+  st=s;
+  var c=cls(String(s.status));
+  $("status").textContent=label(s.status);$("status").className="big "+c;
+  $("state").textContent=String(s.state||"-");$("state").className="pill "+c;
+  $("reason").textContent=String(s.reason||"");
+  $("rthr").textContent=fmt(s.rms_threshold,"m/s²",2);
+  $("lthr").textContent=fmt(s.light_threshold,"lux",1);
+  draw();
+}
+function push(arr,v){arr.push(v);if(arr.length>MAXPTS)arr.shift()}
+function onEdge1(d){
+  var a=num(d.door_angle_deg),r=num(d.motion_rms);
+  if(a===null)return;
+  last1=Date.now();push(d1,a);
+  $("angle").textContent=fmt(a,"°");$("rms").textContent=fmt(r,"m/s²",2);draw();
+}
+function onEdge2(d){
+  var l=num(d.light_lux);
+  if(l===null)return;
+  last2=Date.now();push(d2,l);
+  $("lux").textContent=fmt(l,"lux");$("delta").textContent=fmt(d.light_delta,"lux");draw();
+}
+function onAlert(a){
+  var ul=$("alerts");
+  if(ul.firstChild&&ul.firstChild.className==="empty")ul.innerHTML="";
+  var li=document.createElement("li");
+  var b=document.createElement("b");b.textContent=label(a.status);
+  var sp=document.createElement("span");
+  var t=num(a.sent_at_ms);
+  sp.textContent=(t?new Date(t).toLocaleTimeString("en-GB"):"")+" · "+String(a.reason||"");
+  li.appendChild(b);li.appendChild(sp);ul.insertBefore(li,ul.firstChild);
+  while(ul.children.length>20)ul.removeChild(ul.lastChild);
+}
+
+function age(t){if(!t)return"-";var s=Math.round((Date.now()-t)/1000);return s+" dtk lalu"}
+setInterval(function(){$("age1").textContent=age(last1);$("age2").textContent=age(last2)},1000);
+
+function css(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
+function line(cv,data,color,thr,base){
+  var dpr=window.devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;
+  if(!w||!h)return;
+  cv.width=w*dpr;cv.height=h*dpr;
+  var g=cv.getContext("2d");g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,w,h);
+  var padL=34,padR=6,padT=6,padB=14;
+  if(data.length<2){g.fillStyle=css("--mute");g.font="12px system-ui";g.fillText("Menunggu data...",padL,h/2);return}
+  var lo=Math.min.apply(null,data),hi=Math.max.apply(null,data);
+  if(thr!=null){hi=Math.max(hi,thr);lo=Math.min(lo,thr)}
+  if(base!=null){lo=Math.min(lo,base)}
+  if(hi-lo<1){hi+=.5;lo-=.5}
+  var X=function(i){return padL+(w-padL-padR)*i/(MAXPTS-1)};
+  var Y=function(v){return padT+(h-padT-padB)*(1-(v-lo)/(hi-lo))};
+  g.strokeStyle=css("--line");g.fillStyle=css("--mute");g.font="11px system-ui";g.lineWidth=1;
+  [lo,(lo+hi)/2,hi].forEach(function(v){g.beginPath();g.moveTo(padL,Y(v));g.lineTo(w-padR,Y(v));g.stroke();
+    g.fillText(v.toFixed(Math.abs(hi-lo)<10?1:0),2,Y(v)+4)});
+  if(thr!=null){g.strokeStyle=css("--mute");g.setLineDash([5,4]);g.beginPath();g.moveTo(padL,Y(thr));g.lineTo(w-padR,Y(thr));g.stroke();g.setLineDash([])}
+  g.strokeStyle=css(color);g.lineWidth=2;g.beginPath();
+  var off=MAXPTS-data.length;
+  data.forEach(function(v,i){var x=X(i+off),y=Y(v);i?g.lineTo(x,y):g.moveTo(x,y)});
+  g.stroke();
+}
+function draw(){
+  var base=num(st.angle_baseline_deg)||0,open=num(st.open_deg);
+  line($("c1"),d1,"--c1",open===null?null:base+open,base);
+  line($("c2"),d2,"--c2",num(st.light_threshold),null);
+}
+window.addEventListener("resize",draw);
+draw();
+
+$("go").onclick=connect;
+$("pid").addEventListener("keydown",function(e){if(e.key==="Enter")connect()});
+function cmd(c){if(client&&client.connected)client.publish("laciguard/"+pid+"/control",c,{qos:1})}
+$("arm").onclick=function(){cmd("ARM")};
+$("disarm").onclick=function(){cmd("DISARM")};
+})();
+</script>
+</body>
+</html>
