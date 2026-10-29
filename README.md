@@ -12,7 +12,7 @@ Sistem pemantau keamanan pintu lemari dan kamar kos berbasis IoT. Proyek ini men
 | Nathanael Tonyus Wilbert Sianipar | 24060125140166 |
 | Randradinata Faiq Prayogo | 24060125120028 |
 
-Repositori: https://www.google.com/search?q=https://github.com/fransranju-sys/laciguard-IoT
+Repositori: https://github.com/fransranju-sys/laciguard-IoT
 
 ## Masalah dan Ide
 
