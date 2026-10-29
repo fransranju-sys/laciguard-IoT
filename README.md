@@ -1,5 +1,6 @@
 [readme (1).md](https://github.com/user-attachments/files/34113899/readme.1.md)
 # LaciGuard
+<img width="1312" height="815" alt="Screenshot 2026-10-29 221052" src="https://github.com/user-attachments/assets/1fcf61eb-0e5e-4539-a5c1-ac9843ceab4c" />
 
 Sistem pemantau keamanan pintu lemari dan kamar kos berbasis IoT. Proyek ini menggunakan **2 HP Android sebagai edge device**, **3 sensor** (*accelerometer*, *gyroscope*, dan sensor cahaya), pengolahan data di sisi edge, algoritma **sensor fusion + state machine** di laptop, serta komunikasi dua arah lewat **MQTT**.
 
