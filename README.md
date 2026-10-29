@@ -178,4 +178,4 @@ Daftar skenario pengujian fisik untuk demo dan dokumentasi:
 
 ## Referensi
 
-Struktur dasar komunikasi MQTT, pembacaan sensor, dan dashboard mengadaptasi pola dari repositori contoh kuliah [PocketGuard (contoh-project-iot1)](https://www.google.com/search?q=https://github.com/myudak/contoh-project-iot1) (lisensi MIT). Kasus penggunaan, gabungan sensor gerak dan cahaya, perhitungan sudut pintu, serta aturan state machine pada LaciGuard dibuat sendiri oleh Kelompok 15.
+Struktur dasar komunikasi MQTT, pembacaan sensor, dan dashboard mengadaptasi pola dari repositori contoh kuliah [PocketGuard (contoh-project-iot1)](github.com/myudak/contoh-project-iot1) (lisensi MIT). Kasus penggunaan, gabungan sensor gerak dan cahaya, perhitungan sudut pintu, serta aturan state machine pada LaciGuard dibuat sendiri oleh Kelompok 15.
