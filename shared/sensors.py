@@ -68,15 +68,39 @@ def list_sensors() -> list:
     return json.loads(out)["sensors"]
 
 
-def find_sensor(names, keyword: str, exclude=("uncalibrated",)):
-    """Cari nama sensor yang memuat keyword; utamakan varian 'Non-wakeup'."""
-    kw = keyword.lower()
-    cands = [
-        n for n in names
-        if kw in n.lower() and not any(e in n.lower() for e in exclude)
-    ]
-    cands.sort(key=lambda n: ("wakeup" in n.lower() and "non-wakeup" not in n.lower()))
-    return cands[0] if cands else None
+def find_sensor(names, keyword, exclude=("uncalibrated", "uncali")):
+    """Cari nama sensor yang memuat keyword (atau salah satu keyword bila tuple).
+
+    Utamakan varian 'Non-wakeup'. Keyword dicoba berurutan, jadi taruh yang
+    paling spesifik di depan.
+    """
+    keywords = (keyword,) if isinstance(keyword, str) else tuple(keyword)
+    for kw in keywords:
+        kw = kw.lower()
+        cands = [
+            n for n in names
+            if kw in n.lower() and not any(e in n.lower() for e in exclude)
+        ]
+        cands.sort(key=lambda n: ("wakeup" in n.lower() and "non-wakeup" not in n.lower()))
+        if cands:
+            return cands[0]
+    return None
+
+
+def pick_sensor(names, keywords, env_var):
+    """Pilih sensor: nama dari .env (env_var) jika ada, kalau tidak cari otomatis.
+
+    Nama di HP berbeda-beda (mis. 'lsm6dso_acc' atau 'Accelerometer Non-wakeup'),
+    jadi bila pencarian otomatis gagal, isi nama persisnya di .env, contoh:
+        ACCEL_SENSOR=lsm6dso_acc
+    """
+    forced = os.getenv(env_var, "").strip()
+    if forced:
+        for n in names:
+            if n.lower() == forced.lower():
+                return n
+        return find_sensor(names, forced, exclude=())
+    return find_sensor(names, keywords)
 
 
 # --------------------------------------------------------------------------
@@ -177,10 +201,10 @@ class TermuxMotionSource:
 
     def __init__(self, mode: str = "stream"):
         names = list_sensors()
-        self.accel_name = find_sensor(names, "accelerometer")
-        self.gyro_name = find_sensor(names, "gyroscope")
+        self.accel_name = pick_sensor(names, ("accelerometer", "_acc", "accel"), "ACCEL_SENSOR")
+        self.gyro_name = pick_sensor(names, ("gyroscope", "_gyro", "gyro"), "GYRO_SENSOR")
         if not self.accel_name or not self.gyro_name:
-            raise RuntimeError("Accelerometer/gyroscope tidak ditemukan. Cek: termux-sensor -l")
+            raise RuntimeError("Accelerometer/gyroscope tidak ditemukan. Cek: termux-sensor -l, lalu isi ACCEL_SENSOR dan GYRO_SENSOR di .env")
         self.reader = TermuxSensorReader([self.accel_name, self.gyro_name], mode)
         self.reader.start()
 
@@ -200,9 +224,9 @@ class TermuxLightSource:
 
     def __init__(self, mode: str = "stream"):
         names = list_sensors()
-        self.light_name = find_sensor(names, "light")
+        self.light_name = pick_sensor(names, ("light", "ambient", "_l"), "LIGHT_SENSOR")
         if not self.light_name:
-            raise RuntimeError("Sensor cahaya tidak ditemukan. Cek: termux-sensor -l")
+            raise RuntimeError("Sensor cahaya tidak ditemukan. Cek: termux-sensor -l, lalu isi LIGHT_SENSOR di .env")
         self.reader = TermuxSensorReader([self.light_name], mode, delay_ms=200)
         self.reader.start()
 
