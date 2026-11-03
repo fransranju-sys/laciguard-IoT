@@ -30,3 +30,21 @@ def test_parse_objek_json_berurutan_dan_terpotong():
 def test_parse_mengabaikan_sampah_di_depan():
     objs, rest = iter_json_objects('warning!!\n{"a": {"values": [1]}}')
     assert len(objs) == 1 and rest == ""
+
+
+def test_nama_sensor_xiaomi():
+    from shared.sensors import find_sensor
+    names = ["lsm6dso_acc", "qmc6308", "lsm6dso_gyro", "tcs3701_l", "tcs3701_p", "LINEARACCEL",
+             "UNCALI_ACC", "UNCALI_GYRO", "als_factory_str"]
+    assert find_sensor(names, ("accelerometer", "_acc", "accel")) == "lsm6dso_acc"
+    assert find_sensor(names, ("gyroscope", "_gyro", "gyro")) == "lsm6dso_gyro"
+    assert find_sensor(names, ("light", "ambient", "_l")) == "tcs3701_l"
+
+
+def test_nama_sensor_lama_tetap_jalan():
+    from shared.sensors import find_sensor
+    names = ["lsm6dso Accelerometer Non-wakeup", "lsm6dso Gyroscope Non-wakeup",
+             "stk_stk3bcx Ambient Light Sensor Non-wakeup", "stk_stk3bcx Ambient Light Sensor Wakeup"]
+    assert find_sensor(names, ("accelerometer", "_acc")) == names[0]
+    assert find_sensor(names, ("gyroscope", "_gyro")) == names[1]
+    assert find_sensor(names, ("light", "ambient")) == names[2]

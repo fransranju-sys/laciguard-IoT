@@ -1,4 +1,3 @@
-[readme (1).md](https://github.com/user-attachments/files/34113899/readme.1.md)
 # LaciGuard
 <img width="1312" height="815" alt="Screenshot 2026-10-29 221052" src="https://github.com/user-attachments/assets/1fcf61eb-0e5e-4539-a5c1-ac9843ceab4c" />
 
@@ -55,7 +54,9 @@ Lemari atau kamar kos sering ditinggal dalam keadaan terkunci, tetapi penghuni t
 | `shared/alarm.py` | Pemicu getar (`termux-vibrate`) dan notifikasi (`termux-notification`) di HP B |
 | `shared/config.py` | Pembaca pengaturan dari file `.env` |
 | `dashboard/index.html` | Halaman web pemantau status, grafik sudut & cahaya, riwayat alert, dan tombol `ARM`/`DISARM` |
-| `tests/` | Unit test otomatis (28 test dengan `pytest`) |
+| `ai/` | Penerapan AI: perekam data (`collect.py`), pelatihan Decision Tree (`train.py`), klasifikasi kejadian (`classifier.py`, `features.py`) |
+| `requirements-ai.txt` | Library tambahan untuk AI (`scikit-learn`), dipasang di laptop |
+| `tests/` | Unit test otomatis dengan `pytest` |
 
 ## Pengolahan Data
 
@@ -63,7 +64,7 @@ Pengolahan data dilakukan di kedua HP sebelum dikirim ke broker, ditambah kalibr
 
 | Kode | Lokasi | Pengolahan | Rumus / Cara Hitung |
 | :--- | :--- | :--- | :--- |
-| **A** | Edge 1 (`hp_pintu.py`) | RMS getaran | `sqrt(mean((|a| - 9.81)^2))` — mengurangi gravitasi dari total percepatan 3 sumbu |
+| **A** | Edge 1 (`hp_pintu.py`) | RMS getaran | `sqrt(mean((abs(a) - 9.81)^2))` — mengurangi gravitasi dari total percepatan 3 sumbu |
 | **B** | Edge 1 (`hp_pintu.py`) | Sudut bukaan pintu | `sudut += (gyro . arah_gravitasi) * dt` — proyeksi kecepatan putar ke sumbu gravitasi agar posisi tempel HP bebas |
 | **C** | Edge 2 (`hp_dalam.py`) | Rata-rata cahaya | Rata-rata bergerak (*moving average*) dari 3 window pembacaan lux terakhir |
 | **D** | Edge 2 (`hp_dalam.py`) | Lonjakan cahaya (`light_delta`) | `lux_rata_rata - baseline_EMA` — selisih cahaya saat ini terhadap baseline normal |
@@ -159,6 +160,7 @@ Ketik `arm` di terminal `detector.py`, lalu tunggu sekitar 40 detik untuk meliha
 - **Posisi HP B:** Letakkan di dalam lemari dengan bagian atas layar (sensor cahaya) tidak tertutup barang. Jangan mengubah kecerahan layar setelah kalibrasi selesai.
 - **Waktu kalibrasi:** Selama 10 detik pertama setelah tombol `ARM` ditekan, biarkan pintu tertutup dan jangan disentuh.
 - **Parameter aturan:** Nilai ambang seperti `open_deg`, `nudge_deg`, `force_rms`, `entry_delay_s`, `calibration_s`, `rms_margin`, dan `light_margin` bisa disesuaikan di dalam `nodes/detector_service/rules.py` pada bagian `RuleConfig`.
+- **Nama sensor berbeda tiap HP:** program mencari sensor otomatis. Jika muncul pesan sensor tidak ditemukan, isi nama persisnya (lihat `termux-sensor -l`) di `.env`, misalnya `ACCEL_SENSOR=lsm6dso_acc`, `GYRO_SENSOR=lsm6dso_gyro`, `LIGHT_SENSOR=...`.
 
 ## Pengujian
 
@@ -175,6 +177,45 @@ Daftar skenario pengujian fisik untuk demo dan dokumentasi:
 4. **Dibuka paksa (`ALERT_DIPAKSA`):** tarik atau hentakkan pintu dengan keras saat `ARMED` (alarm langsung bunyi tanpa jeda).
 5. **Uji gangguan cahaya luar:** nyalakan atau matikan lampu kamar saat pintu lemari tertutup (status tetap `AMAN`).
 6. **Mode nonaktif (`DISARMED`):** tekan `DISARM` lalu buka pintu (status tetap `AMAN`).
+
+## Penerapan AI: Klasifikasi Kejadian Pintu
+
+Selain aturan (ambang dan state machine), detector memakai model **Decision Tree** (scikit-learn) untuk mengenali jenis kejadian.
+
+| Tahap | Isi |
+|:---|:---|
+| Input | 6 fitur dari 3 detik telemetry kedua HP: perubahan sudut, rentang sudut, getaran maksimum dan rata-rata, lonjakan cahaya, rentang lux |
+| Proses | Decision Tree (kedalaman 4) yang dilatih dari data pengujian sendiri |
+| Output | Kelas kejadian: `DIAM`, `BUKA_NORMAL`, `DIPAKSA`, `KETUKAN`, `CAHAYA_SAJA`, beserta tingkat keyakinan |
+
+Hasil AI tampil di dashboard dan pada setiap alert (`ai_event`, `ai_confidence`, `ai_agrees`, yaitu apakah AI sependapat dengan alert dari aturan). Aturan tetap berjalan bila model belum ada.
+
+### Cara memakai (di laptop)
+
+```
+pip install -r requirements-ai.txt
+```
+
+1. Jalankan `detector.py`, `hp_pintu.py`, dan `hp_dalam.py` seperti biasa.
+2. Rekam data tiap kelas. Ulangi kejadian selama perekaman, minimal 2 kali per kelas:
+
+```
+python -m ai.collect --label DIAM --duration 60
+python -m ai.collect --label BUKA_NORMAL --duration 60
+python -m ai.collect --label DIPAKSA --duration 60
+python -m ai.collect --label KETUKAN --duration 60
+python -m ai.collect --label CAHAYA_SAJA --duration 60
+```
+
+   Data tersimpan di `ai/data/dataset.csv`.
+3. Latih model:
+
+```
+python -m ai.train
+```
+
+   Hasil: `ai/model.joblib` dan `ai/report.txt` (akurasi, confusion matrix, aturan pohon).
+4. Jalankan ulang `python detector.py`. Pesan `[AI] model dimuat` menandakan AI aktif. Gunakan `--no-ai` untuk menjalankan hanya dengan aturan.
 
 ## Referensi
 

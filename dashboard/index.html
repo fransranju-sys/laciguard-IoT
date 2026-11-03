@@ -68,6 +68,12 @@ li b{color:var(--bad)}li span{display:block;color:var(--mute);font-size:12px}
   </div>
 </div>
 
+<div class="card">
+  <h2>Klasifikasi AI (Decision Tree)</h2>
+  <div class="status"><span id="aiEvent" class="pill">-</span><span id="aiConf" style="color:var(--mute);font-size:13px"></span></div>
+  <p class="reason" id="aiNote">Menunggu data dari detector.py</p>
+</div>
+
 <div class="grid">
   <div class="card"><h2>Edge 1 · HP di pintu</h2>
     <dl><dt>Sudut pintu</dt><dd id="angle">-</dd><dt>Getaran (RMS)</dt><dd id="rms">-</dd>
@@ -91,7 +97,7 @@ li b{color:var(--bad)}li span{display:block;color:var(--mute);font-size:12px}
 (function(){
 "use strict";
 var $=function(id){return document.getElementById(id)};
-var MAXPTS=120, LIVE_MS=4000, client=null, pid="", last1=0, last2=0, statusAt=0, st={};
+var MAXPTS=120, client=null, pid="", last1=0, last2=0, st={};
 var d1=[], d2=[];
 
 try{var saved=localStorage.getItem("laciguard_pid");if(saved)$("pid").value=saved;}catch(e){}
@@ -113,51 +119,49 @@ function connect(){
   try{localStorage.setItem("laciguard_pid",pid)}catch(e){}
   if(typeof mqtt==="undefined"){setConn("Library MQTT gagal dimuat (cek internet)","bad");return}
   if(client){client.end(true)}
-  d1=[];d2=[];st={};last1=0;last2=0;statusAt=0;renderStatus();
   setConn("Menghubungkan...","warn");
   client=mqtt.connect($("url").value.trim(),{reconnectPeriod:2000,connectTimeout:8000,
     clientId:"laciguard-dash-"+Math.random().toString(16).slice(2,10)});
   client.on("connect",function(){
-    setConn("Terhubung","ok");renderStatus();
+    setConn("Terhubung","ok");$("arm").disabled=false;$("disarm").disabled=false;
     client.subscribe("laciguard/"+pid+"/#");
     $("cfg").open=false;
   });
   client.on("reconnect",function(){setConn("Menyambung ulang...","warn")});
-  client.on("close",function(){setConn("Terputus","bad");renderStatus()});
+  client.on("close",function(){setConn("Terputus","bad");$("arm").disabled=true;$("disarm").disabled=true});
   client.on("error",function(){setConn("Gagal terhubung","bad")});
-  client.on("message",function(topic,payload,packet){
+  client.on("message",function(topic,payload){
     var data;try{data=JSON.parse(payload.toString())}catch(e){return}
     if(!data||typeof data!=="object")return;
     var tail=topic.slice(("laciguard/"+pid+"/").length);
-    if(tail==="status")onStatus(data,packet&&packet.retain);
+    if(tail==="status")onStatus(data);
     else if(tail==="alerts")onAlert(data);
     else if(tail==="edge/edge1/telemetry")onEdge1(data);
     else if(tail==="edge/edge2/telemetry")onEdge2(data);
   });
 }
 
-function isLive(){return statusAt>0&&Date.now()-statusAt<LIVE_MS}
-function onStatus(s,retained){
+function onStatus(s){
   st=s;
-  if(!retained)statusAt=Date.now(); // pesan retained = kiriman lama dari broker, bukan bukti detector hidup
-  renderStatus();
+  var c=cls(String(s.status));
+  $("status").textContent=label(s.status);$("status").className="big "+c;
+  $("state").textContent=String(s.state||"-");$("state").className="pill "+c;
+  $("reason").textContent=String(s.reason||"");
   $("rthr").textContent=fmt(s.rms_threshold,"m/s²",2);
   $("lthr").textContent=fmt(s.light_threshold,"lux",1);
+  onAi(s);
   draw();
 }
-function renderStatus(){
-  var connected=!!(client&&client.connected),live=connected&&isLive(),s=st,text,c,state,reason;
-  if(!s||!s.status){text="-";c="";state="-";reason=connected?"Menunggu data dari detector.py":"Belum terhubung ke broker"}
-  else if(!live){text="DETECTOR TIDAK TERDETEKSI";c="warn";state="-";
-    reason="Status terakhir: "+label(s.status)+". Jalankan python detector.py dengan PROJECT_ID yang sama."}
-  else if(s.state==="DISARMED"){text="TIDAK AKTIF";c="";state="DISARMED";reason="Tekan ARM untuk mulai menjaga lemari."}
-  else{text=label(s.status);c=cls(String(s.status));state=String(s.state||"-");reason=String(s.reason||"")}
-  $("status").textContent=text;$("status").className="big "+c;
-  $("state").textContent=state;$("state").className="pill "+c;
-  $("reason").textContent=reason;
-  var cur=live&&s?s.state:null;
-  $("arm").disabled=!(live&&cur==="DISARMED");
-  $("disarm").disabled=!(live&&cur&&cur!=="DISARMED");
+var AICLS={DIAM:"ok",BUKA_NORMAL:"warn",DIPAKSA:"bad",KETUKAN:"warn",CAHAYA_SAJA:""};
+function onAi(s){
+  var e=$("aiEvent");
+  if(!s.ai_enabled){e.textContent="AI nonaktif";e.className="pill";$("aiConf").textContent="";
+    $("aiNote").textContent="Model belum dilatih. Jalankan python -m ai.train di laptop.";return}
+  var ev=s.ai_event,c=num(s.ai_confidence);
+  if(!ev){e.textContent="-";e.className="pill";$("aiConf").textContent="";$("aiNote").textContent="Menunggu data kedua edge";return}
+  e.textContent=label(ev);e.className="pill "+(AICLS[ev]||"");
+  $("aiConf").textContent=c===null?"":"keyakinan "+Math.round(c*100)+"%";
+  $("aiNote").textContent="Input: perubahan sudut, getaran, dan cahaya 3 detik terakhir";
 }
 function push(arr,v){arr.push(v);if(arr.length>MAXPTS)arr.shift()}
 function onEdge1(d){
@@ -179,13 +183,14 @@ function onAlert(a){
   var b=document.createElement("b");b.textContent=label(a.status);
   var sp=document.createElement("span");
   var t=num(a.sent_at_ms);
-  sp.textContent=(t?new Date(t).toLocaleTimeString("en-GB"):"")+" · "+String(a.reason||"");
+  var aiTxt=a.ai_event?" · AI: "+label(a.ai_event)+(num(a.ai_confidence)===null?"":" "+Math.round(num(a.ai_confidence)*100)+"%"):"";
+  sp.textContent=(t?new Date(t).toLocaleTimeString("en-GB"):"")+" · "+String(a.reason||"")+aiTxt;
   li.appendChild(b);li.appendChild(sp);ul.insertBefore(li,ul.firstChild);
   while(ul.children.length>20)ul.removeChild(ul.lastChild);
 }
 
-function age(t){if(!t)return"-";var s=Math.round((Date.now()-t)/1000);return s+" dtk lalu"+(s>5?" (tidak mengirim)":"")}
-setInterval(function(){$("age1").textContent=age(last1);$("age2").textContent=age(last2);renderStatus()},1000);
+function age(t){if(!t)return"-";var s=Math.round((Date.now()-t)/1000);return s+" dtk lalu"}
+setInterval(function(){$("age1").textContent=age(last1);$("age2").textContent=age(last2)},1000);
 
 function css(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
 function line(cv,data,color,thr,base){
